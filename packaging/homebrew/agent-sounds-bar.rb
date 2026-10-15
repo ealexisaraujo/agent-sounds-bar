@@ -14,7 +14,7 @@ cask "agent-sounds-bar" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
   # play-sound reads its settings with jq. macOS 15+ ships /usr/bin/jq; macOS 14 does not.
   depends_on formula: "jq"
 
