@@ -90,7 +90,9 @@ publish() {
   sed -e "s/__VERSION__/$VERSION/" -e "s/__SHA256__/$sha/" packaging/homebrew/agent-sounds-bar.rb \
     | grep -v '^# Template for\|^# scripts/release.sh fills' > "$tap/Casks/agent-sounds-bar.rb"
   git -C "$tap" add Casks/agent-sounds-bar.rb
-  git -C "$tap" commit -q -m "agent-sounds-bar $VERSION"
+  # Author tap commits like this repo's commits, not with whatever the global git identity is.
+  git -C "$tap" -c user.name="$(git config user.name)" -c user.email="$(git config user.email)" \
+    commit -q -m "agent-sounds-bar $VERSION"
   git -C "$tap" push -q
   say "Done: brew install --cask ealexisaraujo/tap/agent-sounds-bar"
 }

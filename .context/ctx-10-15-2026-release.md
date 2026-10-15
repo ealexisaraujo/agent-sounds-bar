@@ -31,3 +31,12 @@ Modeled on CodexBar's path for Homebrew and unsigned installs (CodexBar uses Spa
 - Self-install for direct downloads (download, verify the Developer ID team of the new bundle, swap, relaunch), or Sparkle with an appcast, if direct installs become common.
 - Signing and notarizing in GitHub Actions: export the Developer ID cert as a p12 secret plus a notarytool API key; `release.sh` already takes everything from env vars.
 - A beta cask (`agent-sounds-bar@beta`) if Homebrew users want betas in place.
+
+## v1.0.0 release log (10-15-2026)
+- Notarization submission `c489849c-df35-4146-84c1-1d871b4b23cb`: Accepted. Stapled; `spctl` reports "Notarized Developer ID". Universal (arm64, x86_64).
+- Zip SHA-256 `40e0f8ec1dd030cfbafa4fe27b8c3536fd6866bbd59114fae403977b85461364`. The asset downloaded from GitHub matches it and the cask.
+- Tag `v1.0.0` points at `e50117d`, the commit that was built.
+- `brew install --cask ealexisaraujo/tap/agent-sounds-bar` on this machine installed jq and moved the app to /Applications. The quarantined copy passes Gatekeeper, `check-update` reports "installed via Homebrew", "up to date".
+- Homebrew 7 lists the tap as "Untrusted" (third-party tap) and prints a Tap-Trust notice during install; the install still succeeds.
+- `brew livecheck` and `brew style` fail here on the rubygems SSL error, so neither was run.
+- The tap's first commit (`a4444ab`, README) carries the global git email `aaraujo@consumertrack.com`. A force-push to re-author it was blocked and left to the user. `release.sh` now authors tap commits with this repo's `user.email`.
