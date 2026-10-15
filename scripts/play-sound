@@ -1,0 +1,90 @@
+#!/bin/bash
+# agent-sounds-cli-version: 3
+# play-sound <event>
+#
+# Plays the sound configured for <event> at the configured volume.
+# Called from Claude Code / Codex / other agent hooks. Always exits 0 so a
+# broken config can never break an agent.
+#
+# Events: session_start, user_prompt_submit, stop, stop_error, notification
+# For `stop`, the hook JSON is read from stdin; if the transcript shows a
+# rate-limit/overload error the `stop_error` sound is used instead.
+#
+# AGENT_SOUNDS_AGENT=<name> (set by the hook command) is recorded in the history log.
+# Env overrides (used by tests): AGENT_SOUNDS_HOME, AGENT_SOUNDS_PLAYER
+
+HOME_DIR="${AGENT_SOUNDS_HOME:-$HOME/.config/agent-sounds}"
+CONFIG="$HOME_DIR/config.json"
+SOUNDS_DIR="$HOME_DIR/sounds"
+PLAYER="${AGENT_SOUNDS_PLAYER:-afplay}"
+HISTORY="$HOME_DIR/history.log"
+
+EVENT="${1:-}"
+[ -z "$EVENT" ] && exit 0
+
+if [ "$EVENT" = "stop" ] && [ ! -t 0 ]; then
+  INPUT=$(cat)
+  TRANSCRIPT=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+  if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ] && \
+     tail -50 "$TRANSCRIPT" | grep -qi 'overloaded_error\|rate_limit_error\|"status":429\|"status":529\|too_many_requests'; then
+    EVENT="stop_error"
+  fi
+fi
+
+# Append "<epoch>\t<event>\t<result>\t<sound>\t<agent>" to the history log (kept to ~200
+# lines). The menu bar app reads it to animate its icon and show recent activity.
+log() {
+  { printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%s)" "$EVENT" "$1" "$2" "${AGENT_SOUNDS_AGENT:-}" >> "$HISTORY"
+    if [ "$(wc -l < "$HISTORY")" -gt 300 ]; then
+      tail -200 "$HISTORY" > "$HISTORY.tmp" && mv "$HISTORY.tmp" "$HISTORY"
+    fi
+  } 2>/dev/null
+}
+
+# Built-in defaults, used when the config is missing or unreadable. They are the sounds
+# every Mac ships in /System/Library/Sounds, so nothing has to be installed or bundled.
+SYS=/System/Library/Sounds
+case "$EVENT" in
+  session_start)      DEFAULT_SOUND="$SYS/Hero.aiff" ;;
+  user_prompt_submit) DEFAULT_SOUND="$SYS/Tink.aiff" ;;
+  stop)               DEFAULT_SOUND="$SYS/Glass.aiff" ;;
+  stop_error)         DEFAULT_SOUND="$SYS/Basso.aiff" ;;
+  notification)       DEFAULT_SOUND="$SYS/Ping.aiff" ;;
+  *)                  exit 0 ;;
+esac
+
+MUTED=false
+VOLUME=1
+ENABLED=true
+SOUND=""
+
+if [ -f "$CONFIG" ]; then
+  # jq treats `false // x` as x, so test enabled with an explicit comparison.
+  ROW=$(jq -r --arg e "$EVENT" '[
+      (.muted == true),
+      (.volume // 1),
+      (.events[$e].enabled != false),
+      (.events[$e].sound // "")
+    ] | @tsv' "$CONFIG" 2>/dev/null) || ROW=""
+  if [ -n "$ROW" ]; then
+    IFS=$'\t' read -r MUTED VOLUME ENABLED SOUND <<< "$ROW"
+  fi
+fi
+
+[ "$MUTED" = "true" ] && { log muted ""; exit 0; }
+[ "$ENABLED" = "false" ] && { log disabled ""; exit 0; }
+
+# Clamp volume to 0..1; anything non-numeric falls back to 1.
+VOLUME=$(awk -v v="$VOLUME" 'BEGIN { if (v !~ /^[0-9]*\.?[0-9]+$/) v = 1; if (v > 1) v = 1; if (v < 0) v = 0; printf "%.3f", v }')
+[ "$VOLUME" = "0.000" ] && { log zero_volume ""; exit 0; }
+
+[ -z "$SOUND" ] && SOUND="$DEFAULT_SOUND"
+case "$SOUND" in
+  /*) FILE="$SOUND" ;;
+  *)  FILE="$SOUNDS_DIR/$SOUND" ;;
+esac
+[ -f "$FILE" ] || { log missing_file "$SOUND"; exit 0; }
+
+log played "$SOUND"
+"$PLAYER" -v "$VOLUME" "$FILE" >/dev/null 2>&1 &
+exit 0
