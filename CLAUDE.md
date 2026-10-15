@@ -57,5 +57,6 @@ scripts/release.sh build | publish             # release (see the release doc); 
 
 ## Git
 - Branch: `main`, public at `github.com/ealexisaraujo/agent-sounds-bar`. Commit only when asked.
+- **Make every commit from a path under `~/Documents/cursos/`.** The personal identity (`ala1289@gmail.com`, SSH signing with `id_ed25519_personal`) comes from an `includeIf "gitdir:~/Documents/cursos/"` in `~/.gitconfig`, and the personal `GIT_SSH_COMMAND`/`GH_TOKEN` from direnv (`~/Documents/cursos/.envrc`). Anywhere else, such as `/tmp` or the scratchpad, git falls back to the global work identity and work GPG key. Clone other repos, like the Homebrew tap, into the ignored `build/` folder. Check with `git whoami` before committing.
 - End commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>`.
 - `build/`, `dist/`, `.build/` and `.serena/` are ignored.
